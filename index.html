@@ -46,8 +46,6 @@
             overflow-x: hidden;
             scroll-behavior: smooth;
             word-break: break-word;
-            /* 避免图片、段落被拦腰截断 */
-            orphans: 2; widows: 2;
         }
         
         /* 亚克力毛玻璃滤镜 */
@@ -60,6 +58,8 @@
         .text-justify-custom { 
             text-align: justify; 
             text-justify: inter-ideograph;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
         }
         
         /* 字体预设 */
@@ -151,15 +151,15 @@
                     style={{ columnWidth: `${containerWidth}px` }}
                     onScroll={onScroll}
                 >
-                    <h2 className="font-bold mb-8 mt-2 leading-snug px-6 pt-2" style={{ fontSize: `${settings.fontSize * 1.4}px` }}>
+                    <h2 className="font-bold mb-5 mt-2 leading-snug px-4 pt-2" style={{ fontSize: `${settings.fontSize * 1.3}px` }}>
                         {chapter.title}
                     </h2>
                     {chapter.content.split('\n').map((para, idx) => {
                         const trimmed = para.trim();
                         if (!trimmed) return null;
                         return (
-                            <p key={idx} className="mb-6 text-justify-custom px-6 tracking-wide" 
-                               style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em' }}>
+                            <p key={idx} className="text-justify-custom px-4" 
+                               style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em', marginBottom: '0.4em' }}>
                                 {trimmed}
                             </p>
                         );
@@ -231,10 +231,10 @@
             const [settings, setSettings] = useState(() => {
                 const saved = localStorage.getItem('reader_max_settings');
                 return saved ? JSON.parse(saved) : { 
-                    fontSize: 20, 
+                    fontSize: 18, 
                     themeId: 'sepia', 
                     fontFamily: 'font-sans-system',
-                    lineHeight: 1.8,
+                    lineHeight: 1.5,
                     customBg: '#ffffff', 
                     customText: '#000000', 
                     isCustomTheme: false 
@@ -486,6 +486,18 @@
                 ? { bg: settings.customBg, text: settings.customText, menuBg: settings.customBg + 'EE', border: settings.customText + '33' }
                 : (PRESET_THEMES[settings.themeId] || PRESET_THEMES.light);
 
+            // 动态同步浏览器状态栏和安全区颜色，消灭顶部大黑边
+            useEffect(() => {
+                document.body.style.backgroundColor = activeTheme.bg;
+                let themeMeta = document.querySelector('meta[name="theme-color"]');
+                if (!themeMeta) {
+                    themeMeta = document.createElement('meta');
+                    themeMeta.name = "theme-color";
+                    document.head.appendChild(themeMeta);
+                }
+                themeMeta.content = activeTheme.bg;
+            }, [activeTheme.bg]);
+
             return (
                 <div className="fixed inset-0 overflow-hidden select-none flex flex-col transition-colors duration-500" 
                      style={{ backgroundColor: view === 'reader' ? activeTheme.bg : '#F3F4F6', color: view === 'reader' ? activeTheme.text : '#1F2937' }}>
@@ -566,12 +578,15 @@
                         <div className="absolute inset-0 overflow-hidden z-0">
                             
                             {/* 沉浸式顶部章节名 */}
-                            <div className="absolute top-0 left-0 right-0 px-6 pb-2 text-[11px] opacity-40 z-0 truncate font-medium tracking-wider" style={{ paddingTop: 'max(0.8rem, var(--safe-top))' }}>
+                            <div className="absolute top-0 left-0 right-0 px-4 z-0 truncate font-medium flex items-end" 
+                                 style={{ height: 'calc(var(--safe-top) + 24px)', paddingBottom: '4px', fontSize: '11px', opacity: 0.4 }}>
                                 {currentBook.chapters[currentChapterIndex]?.title}
                             </div>
 
-                            {/* 正文手势区域 */}
-                            <div className="absolute inset-0 pt-10 pb-10 z-10" onClick={handleScreenTap} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+                            {/* 正文手势区域 - 上下留出内边距给页眉页脚 */}
+                            <div className="absolute inset-0 z-10 box-border" 
+                                 style={{ paddingTop: 'calc(var(--safe-top) + 24px)', paddingBottom: 'calc(var(--safe-bottom) + 24px)' }}
+                                 onClick={handleScreenTap} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
                                 <ChapterContent 
                                     chapter={currentBook.chapters[currentChapterIndex]} 
                                     settings={settings} 
@@ -582,7 +597,8 @@
                             </div>
 
                             {/* 沉浸式底部状态栏 */}
-                            <div className="absolute bottom-0 left-0 right-0 pb-2 px-6 flex justify-between items-center text-[11px] opacity-40 z-0 font-medium tracking-wider" style={{ paddingBottom: 'max(0.5rem, var(--safe-bottom))' }}>
+                            <div className="absolute bottom-0 left-0 right-0 px-4 z-0 font-medium flex justify-between items-start" 
+                                 style={{ height: 'calc(var(--safe-bottom) + 24px)', paddingTop: '4px', fontSize: '11px', opacity: 0.4 }}>
                                 <ReaderClock />
                                 <span>{pageInfo.current} / {pageInfo.total} 页 &nbsp;&middot;&nbsp; 进度 {Math.min(100, Math.round(((currentChapterIndex + 1) / currentBook.chapters.length) * 100))}%</span>
                             </div>
@@ -642,9 +658,9 @@
                                         
                                         <div className="flex items-center space-x-4">
                                             <span className="opacity-70 font-medium w-8">间距</span>
-                                            <button onClick={() => setSettings(s => ({...s, lineHeight: 1.5}))} className={`flex-1 py-2 rounded-xl border transition-colors ${settings.lineHeight === 1.5 ? 'border-blue-500 text-blue-500' : ''}`} style={{ borderColor: settings.lineHeight === 1.5 ? '#3B82F6' : activeTheme.border }}><i className="fas fa-align-justify leading-none" style={{transform:'scaleY(0.8)'}}></i></button>
-                                            <button onClick={() => setSettings(s => ({...s, lineHeight: 1.8}))} className={`flex-1 py-2 rounded-xl border transition-colors ${settings.lineHeight === 1.8 ? 'border-blue-500 text-blue-500' : ''}`} style={{ borderColor: settings.lineHeight === 1.8 ? '#3B82F6' : activeTheme.border }}><i className="fas fa-align-justify leading-none"></i></button>
-                                            <button onClick={() => setSettings(s => ({...s, lineHeight: 2.2}))} className={`flex-1 py-2 rounded-xl border transition-colors ${settings.lineHeight === 2.2 ? 'border-blue-500 text-blue-500' : ''}`} style={{ borderColor: settings.lineHeight === 2.2 ? '#3B82F6' : activeTheme.border }}><i className="fas fa-align-justify leading-none" style={{transform:'scaleY(1.2)'}}></i></button>
+                                            <button onClick={() => setSettings(s => ({...s, lineHeight: 1.2}))} className={`flex-1 py-2 rounded-xl border transition-colors ${settings.lineHeight === 1.2 ? 'border-blue-500 text-blue-500' : ''}`} style={{ borderColor: settings.lineHeight === 1.2 ? '#3B82F6' : activeTheme.border }}><i className="fas fa-align-justify leading-none" style={{transform:'scaleY(0.8)'}}></i></button>
+                                            <button onClick={() => setSettings(s => ({...s, lineHeight: 1.5}))} className={`flex-1 py-2 rounded-xl border transition-colors ${settings.lineHeight === 1.5 ? 'border-blue-500 text-blue-500' : ''}`} style={{ borderColor: settings.lineHeight === 1.5 ? '#3B82F6' : activeTheme.border }}><i className="fas fa-align-justify leading-none"></i></button>
+                                            <button onClick={() => setSettings(s => ({...s, lineHeight: 1.8}))} className={`flex-1 py-2 rounded-xl border transition-colors ${settings.lineHeight === 1.8 ? 'border-blue-500 text-blue-500' : ''}`} style={{ borderColor: settings.lineHeight === 1.8 ? '#3B82F6' : activeTheme.border }}><i className="fas fa-align-justify leading-none" style={{transform:'scaleY(1.2)'}}></i></button>
                                         </div>
 
                                         {/* 主题 */}
